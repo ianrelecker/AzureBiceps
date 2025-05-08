@@ -1,23 +1,38 @@
-@description('Name of the Log Analytics Workspace')
-param logAnalyticsWorkspaceName string
-
 @description('Azure region for the Log Analytics Workspace')
 param location string
 
-@description('Set to true to enable monitoring')
-param enableMonitoring bool = false
+@description('Name of the Log Analytics Workspace')
+param workspaceName string
 
-// Create Log Analytics Workspace if monitoring is enabled
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (enableMonitoring) {
-  name: logAnalyticsWorkspaceName
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
+  name: workspaceName
   location: location
   properties: {
     sku: {
       name: 'PerGB2018'
     }
     retentionInDays: 30
+    features: {
+      enableLogAccessUsingOnlyResourcePermissions: true
+    }
   }
 }
 
-// Output the Log Analytics Workspace ID
-output logAnalyticsWorkspaceId string = enableMonitoring ? logAnalyticsWorkspace.id : ''
+// Add the Automation solution to Log Analytics
+resource automationSolution 'Microsoft.OperationsManagement/solutions@2015-11-01-preview' = {
+  name: 'Updates(${workspaceName})'
+  location: location
+  properties: {
+    workspaceResourceId: logAnalyticsWorkspace.id
+  }
+  plan: {
+    name: 'Updates(${workspaceName})'
+    publisher: 'Microsoft'
+    product: 'OMSGallery/Updates'
+    promotionCode: ''
+  }
+}
+
+// Outputs
+output workspaceId string = logAnalyticsWorkspace.id
+output workspaceName string = logAnalyticsWorkspace.name
